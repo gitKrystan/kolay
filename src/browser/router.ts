@@ -4,6 +4,8 @@ import { getOwner } from '@ember/owner';
 import { groupNameForRoute, registerScopedRoute, scopedRouteNameFor } from './scoped-routes.ts';
 import { docsManager } from './services/docs.ts';
 
+import type { Page } from '../types.ts';
+import type { DocsService } from './services/docs.ts';
 import type { RouterDSL } from '@ember/-internals/routing';
 import type Transition from '@ember/routing/transition';
 
@@ -69,6 +71,58 @@ export function addRoutes(
   }
 }
 
+type RouteInfoLike = NonNullable<Transition['to']>['parent'];
+
+/**
+ * The first page of a group, for a visit to the group's own URL.
+ */
+function landingForGroup(docs: DocsService, groupName: string): Page | undefined {
+  const first = docs.groupFor(groupName).list[0];
+
+  if (!first) {
+    console.warn(`Could not determine first page in group: ${groupName}`);
+
+    return;
+  }
+
+  return first;
+}
+
+/**
+ * The first page of a sub-tree, for a visit to its own URL —
+ * `/Group/sub-folder`, which resolves to no document of its own.
+ *
+ * `undefined` for anything that is not a sub-tree visit, including the
+ * ordinary case: a page visit lands here too, with the page as the
+ * wildcard, and must be left alone.
+ */
+function landingForPageTreeVisit(
+  docs: DocsService,
+  parent: RouteInfoLike,
+  wildcardParam: unknown
+): Page | undefined {
+  if (typeof wildcardParam !== 'string' || !wildcardParam) return;
+
+  /**
+   * The wildcard holds only the part of the URL below the mount, so a mount
+   * with a path of its own needs its group put back on the front to name a
+   * sub-tree in the manifest — the same translation
+   * `docsManager.scopedPagePath` makes for the page it is on.
+   *
+   * A scoped mount (`addRoutes(context, groupName)`) names its group in the
+   * binding. An unscoped nested mount takes the group's name as its path,
+   * which is the route above the wildcard. A top-level mount has no path of
+   * its own, so its wildcard already carries the group.
+   */
+  const mountGroup =
+    (parent ? groupNameForRoute(parent.name) : undefined) ??
+    docs.canonicalGroupName(parent?.parent?.localName ?? '');
+
+  return docs.landingForPageTree(
+    mountGroup ? `/${mountGroup}/${wildcardParam}` : `/${wildcardParam}`
+  );
+}
+
 /**
  * Does our target destination exist? if not,
  * redirect to the first page on the namespace
@@ -120,17 +174,16 @@ export function handlePotentialIndexVisit(context: object, transition: Transitio
     )
     .find((match): match is string => match !== undefined);
 
-  if (!groupName) return;
+  /**
+   * A group's own URL lands on its first page. So does a sub-tree's, one
+   * level down: `/Group/sub-folder` names a real place in the docs, but
+   * only a page path resolves to a document.
+   */
+  const first = groupName
+    ? landingForGroup(docs, groupName)
+    : landingForPageTreeVisit(docs, parent, wildcardParam);
 
-  const group = docs.groupFor(groupName);
-
-  const first = group.list[0];
-
-  if (!first) {
-    console.warn(`Could not determine first page in group: ${groupName}`);
-
-    return;
-  }
+  if (!first) return;
 
   const router = getOwner(context)?.lookup('service:router');
 

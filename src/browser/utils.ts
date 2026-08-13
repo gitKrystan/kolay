@@ -31,6 +31,43 @@ export function getIndexPage(x: PageTree): Page | undefined {
 }
 
 /**
+ * The sub-tree at an app-relative path (`/Group/sub-folder`), searched for
+ * in `root` and its descendants. A group's own tree is a `PageTree` too, so
+ * the group's root path matches its tree.
+ */
+export function findPageTree(root: PageTree, appRelativePath: string): PageTree | undefined {
+  if (equalsIgnoreCase(root.appRelativePath, appRelativePath)) return root;
+
+  for (const child of root.pages) {
+    if (!isPageTree(child)) continue;
+
+    const match = findPageTree(child, appRelativePath);
+
+    if (match) return match;
+  }
+
+  return undefined;
+}
+
+/**
+ * The first page in a tree, descending into sub-trees until it finds one.
+ * Sorting has already hoisted `index.md` to the top of the tree that holds
+ * it, so this is that tree's index page whenever it has one, and its first
+ * ordered page when it doesn't.
+ */
+export function firstPageIn(tree: PageTree): Page | undefined {
+  for (const child of tree.pages) {
+    if (!isPageTree(child)) return child;
+
+    const nested = firstPageIn(child);
+
+    if (nested) return nested;
+  }
+
+  return undefined;
+}
+
+/**
  * URLs are conventionally case-insensitive; path/route matching in this
  * library follows that convention rather than treating paths as opaque,
  * case-sensitive strings.

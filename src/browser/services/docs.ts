@@ -14,7 +14,7 @@ import { APIDocs, CommentQuery } from '../typedoc/renderer.gts';
 import { ComponentSignature } from '../typedoc/signature/component.gts';
 import { HelperSignature } from '../typedoc/signature/helper.gts';
 import { ModifierSignature } from '../typedoc/signature/modifier.gts';
-import { equalsIgnoreCase, samePagePath } from '../utils.ts';
+import { equalsIgnoreCase, findPageTree, firstPageIn, samePagePath } from '../utils.ts';
 import { typedocLoader } from './api-docs.ts';
 import { getKey } from './lazy-load.ts';
 import { selected } from './selected.ts';
@@ -528,6 +528,40 @@ class DocsService {
    */
   findByPath = (path: string) => {
     return this.pages.find((page) => samePagePath(page.appRelativePath, path));
+  };
+
+  /**
+   * Where to land when a sub-tree's own URL is visited: its first page — the
+   * same rule `group.list[0]` applies at a group's root. `/Group/sub-folder`
+   * is a URL readers write, and it has an obvious destination, but only a
+   * page path resolves to a document.
+   *
+   * Takes a manifest-space app-relative path, and returns `undefined` when
+   * the path names a page, or names nothing at all.
+   */
+  landingForPageTree = (appRelativePath: string): Page | undefined => {
+    const groups = this.manifest?.groups ?? [];
+
+    /**
+     * A path that already names a page is not a sub-tree visit, and must not
+     * redirect — every page visit lands on the wildcard's index too.
+     *
+     * Searched across every group rather than through `findByPath`, which
+     * looks only in `currentGroup`: that derives from `router.currentURL`,
+     * which still names the *previous* page while a transition is being
+     * resolved. Callers here are mid-transition.
+     */
+    for (const group of groups) {
+      if (group.list.some((page) => samePagePath(page.appRelativePath, appRelativePath))) return;
+    }
+
+    for (const group of groups) {
+      const tree = findPageTree(group.tree, appRelativePath);
+
+      if (tree) return firstPageIn(tree);
+    }
+
+    return undefined;
   };
 }
 

@@ -36,6 +36,14 @@ When a user visits `/Runtime` and the `Runtime` group has pages, they'll be redi
 
 It also handles the app's root: on a visit to `/`, there is no group in the URL, so the user is redirected to the first page of the default (first) group. Give your top-level `index` route the same `beforeModel` (e.g. in `routes/index.ts`) to enable this.
 
+## Folders
+
+A folder inside a group works the same way. `/Runtime/rendering` names a real place in the docs but no document of its own, so it redirects to that folder's first page — just as the group's own URL does. These are URLs readers write by hand and link to, and without this they land on an error page.
+
+Sorting has already put an `index.md` at the top of the folder that holds it, so a folder with an index page lands there; a folder without one lands on its first ordered page.
+
+This applies only to a URL that names no page. A page's own URL lands on the wildcard's index route too, and is left exactly where it is.
+
 ## Nested mounts
 
 `addRoutes()` may also be called inside nested routes, mounting each group as its own route (see [using the docs plugin multiple times](/development/configuring-docs.md)) — optionally scoped to a group via `addRoutes(this, 'group-name')`, in which case the mount's path is free to differ from the group's name. Either way, call `handlePotentialIndexVisit` in the mount route's `beforeModel` — visiting the mount's URL (e.g. `/guides`) lands on the mount's own index:

@@ -141,6 +141,25 @@ module("Multiple docs routes", function (hooks) {
     assert.dom("h1").containsText("Buttons demo");
   });
 
+  test("visiting a folder inside a mount redirects to that folder's first page", async function (assert) {
+    await visit("/help/getting-started");
+
+    assert.strictEqual(
+      currentURL(),
+      "/help/getting-started/intro.md",
+      "a scoped mount's folder redirects in mount space, not manifest space",
+    );
+    assert.dom("h1").containsText("Guides intro");
+
+    await visit("/demos/components");
+
+    assert.strictEqual(
+      currentURL(),
+      "/demos/components/buttons",
+      "and an unscoped mount's folder redirects too",
+    );
+  });
+
   test("visiting a mount's index with a trailing slash also redirects", async function (assert) {
     await visit("/help/");
 
